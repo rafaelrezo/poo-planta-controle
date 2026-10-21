@@ -1,0 +1,33 @@
+name: Testes cumulativos
+on:
+  push:
+    branches: [main, 'projeto/**']
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Selecionar contrato da branch
+        env:
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+        shell: bash
+        run: |
+          case "$BRANCH" in
+            projeto/00-ambiente) etapa=00 ;;
+            projeto/01-aquisicao) etapa=01 ;;
+            projeto/02-controle) etapa=02 ;;
+            projeto/03-supervisor|projeto/04-entrega) etapa=03 ;;
+            main) etapa=$(cat ETAPA_ATUAL) ;;
+            *) echo "Branch sem etapa prevista: $BRANCH"; exit 1 ;;
+          esac
+          echo "ETAPA=$etapa" >> "$GITHUB_ENV"
+      - run: make test ETAPA="$ETAPA"

@@ -1,0 +1,5 @@
+/build/
+/dados/
+/.venv/
+__pycache__/
+*.pyc
