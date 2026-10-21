@@ -7,6 +7,8 @@ Descreva o comportamento, os responsáveis e a alteração no contrato/UML.
 - Comando local e resultado:
 - Link da CI deste commit:
 - Casos comuns, fronteiras e falhas testados:
+- Objetos e métodos autorais exercitados pelos novos testes:
+- `make cobertura`: relatório, caminhos não exercitados e justificativa:
 - ETAPA_ATUAL corresponde ao incremento:
 
 ## Revisão e IA

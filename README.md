@@ -6,6 +6,17 @@ o controlador C++ e o Streamlit são esqueletos executáveis com comportamento
 incompleto identificado. A planta também pode ser usada isoladamente em aulas
 de arquivos, JSON, validação e tratamento de erros.
 
+Você começará executando a planta pronta, verá o arquivo criado e só depois
+desenvolverá os outros programas. Execute os comandos no terminal, na pasta
+que contém este README e o `Makefile`. Não é necessário usar Streamlit para
+começar a gerar ou ler os dados.
+
+```text
+Planta pronta -> planta.json -> seu controlador C++ -> telemetria.json -> sua tela
+     ^                                  |
+     +---------- comando_planta.json ----+
+```
+
 ## 1. O que já funciona
 
 | Parte | Estado inicial | Responsabilidade |
@@ -39,21 +50,85 @@ do professor. Preserve os commits iniciais e acrescente o trabalho da equipe.
 
 O comando compila o C++ com avisos tratados como erros e roda os testes da planta.
 Resultado esperado: `OK`. A etapa 00 confirma a infraestrutura, não o projeto pronto.
+Se aparecer `command not found`, confira se Python, g++ e Make estão instalados
+no terminal Linux/WSL que você está usando. `git remote -v` deve mostrar somente
+`origin`, com o endereço do seu fork nas linhas de leitura e escrita.
 
 ## 3. Experimentar arquivos antes de implementar o controle
 
-Na raiz do fork, execute:
+### 3.1. Gerar uma primeira aquisição
+
+Na raiz do fork, execute este comando. Ele cria a pasta `dados` automaticamente,
+simula três ciclos e encerra; você não precisa interrompê-lo:
 
 ```bash
 python3 -m planta.simulador --dados dados --passos 3 --intervalo 0 --seed 7
+```
+
+| Parte do comando | O que você está pedindo |
+|---|---|
+| `--dados dados` | salvar os arquivos na pasta `dados` |
+| `--passos 3` | executar três ciclos e encerrar |
+| `--intervalo 0` | executar sem esperar entre os ciclos |
+| `--seed 7` | repetir os sorteios ao repetir as mesmas condições |
+
+A última linha começa com `ciclo=3`. Agora leia os dados gerados:
+
+```bash
+python3 tools/inspecionar.py --dados dados
+```
+
+Em uma execução inicial com esses parâmetros e sem comandos de atuação, a saída é:
+
+```text
+Ciclo: 3
+LT-01: 47.004 %
+TT-01: 24.25 C
+Comando confirmado: 0
+```
+
+`LT-01` identifica o nível e `TT-01`, a temperatura. O zero indica que nenhum
+comando foi aceito nesta sessão. A semente fixa reproduz as medições; o instante
+e a identificação da sessão mudam. Para ver a estrutura completa do arquivo:
+
+```bash
 python3 -m json.tool dados/planta.json
+```
+
+| Campo que você verá | Como usá-lo |
+|---|---|
+| `sessao` e `ciclo` | saber se é uma aquisição nova ou um arquivo já processado |
+| `timestamp` | mostrar quando a aquisição ocorreu e identificar dados antigos |
+| `leituras` | obter tag, valor, unidade e estado de cada medição |
+| `atuadores` | saber a atuação que a planta realmente aplicou |
+| `ultimo_comando` | conferir qual solicitação já foi aceita |
+
+O arquivo é um **snapshot**, uma fotografia do estado mais recente. Cada ciclo
+substitui o conteúdo anterior; três ciclos não significam três documentos no
+arquivo. O histórico será uma responsabilidade do projeto, em outro armazenamento.
+
+**Confira antes de continuar:** você consegue localizar o valor do nível e sua
+unidade no JSON, e explicar por que o arquivo termina no ciclo 3?
+
+### 3.2. Entender como seu código utilizará esses dados
+
+O controlador C++ deverá abrir `dados/planta.json`, validar seus campos e
+representar as medições nos objetos que você criar. Depois, sua política decidirá
+a atuação e publicará o comando. A telemetria validada será a entrada do Streamlit.
+O controlador recebe medições da planta; ele não precisa sorteá-las novamente.
+
+Execute o esqueleto atual:
+
+```bash
 make controlador
 ```
 
-A saída da planta termina em `ciclo=3`; o JSON contém duas leituras, com nível e
-temperatura. Sem comando, os atuadores ficam em zero. O C++ mostra
-`CONTROLADOR INCOMPLETO`. O arquivo é um snapshot substituído a cada ciclo;
-não é um arquivo JSONL nem um histórico de todas as aquisições.
+Ele mostra `CONTROLADOR INCOMPLETO`. Isso é esperado: ainda não lê a aquisição,
+não publica `telemetria.json` e não controla a planta. O teste da etapa 01
+mostrará o primeiro comportamento que falta implementar. O programa de inspeção
+fornecido serve para entender o arquivo; a aquisição em C++ é trabalho da equipe.
+
+### 3.3. Ver uma atuação mudar a planta
 
 Para observar atuação, execute a planta continuamente em um terminal:
 
@@ -62,11 +137,11 @@ make planta
 ```
 
 Em outro terminal, na mesma raiz, envie um comando manual e inspecione o arquivo
-depois do próximo ciclo:
+depois do próximo ciclo. Aguarde cerca de um segundo entre o envio e a inspeção:
 
 ```bash
 python3 tools/enviar_comando.py --dados dados --bomba 100 --aquecedor 50
-python3 -m json.tool dados/planta.json
+python3 tools/inspecionar.py --dados dados
 ```
 
 Confirme `ultimo_comando` e as novas atuações. Sem comandos novos, a atuação
@@ -74,32 +149,42 @@ expira após 5 ciclos. Não execute o comissionador e o controlador automático
 simultaneamente: o arquivo de comando deve ter um único escritor. A planta pode
 ser encerrada com Ctrl+C. Cada reinício gera outra sessão e invalida comandos antigos.
 
+**O que observar:** a ferramenta informa o id enviado. Depois, `Comando confirmado`
+mostra esse id e o nível passa a subir enquanto a bomba está atuando. Se esperar
+sem enviar um id novo, a planta zera os atuadores após cinco ciclos. Isso ajuda a
+distinguir pedido escrito, pedido aceito e atuação expirada.
+
 ## 4. Abrir o esqueleto Streamlit
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m pip install -r requirements-dev.txt
 make supervisor PYTHON=.venv/bin/python
 ```
 
 A página inicial tem título, diretório e aviso de implementação incompleta.
 A equipe desenvolverá a leitura de `telemetria.json`, sem acesso direto à planta.
 A variável `POO_DADOS` pode escolher outro diretório para testes e demonstração.
+`requirements-dev.txt` instala também as ferramentas de cobertura; a planta
+isolada usa apenas a biblioteca padrão. Ao terminar de observar a página,
+encerre o comando de Streamlit com Ctrl+C no terminal onde o iniciou.
 
 ## 5. Incrementos e testes cumulativos
 
 Integre cada PR antes de abrir a branch seguinte. Parta da main atualizada e
 altere `ETAPA_ATUAL` no mesmo incremento, para que a CI da main mantenha as verificações.
+`make test` sem `ETAPA` lê esse arquivo; especificar `ETAPA=01`, por exemplo,
+permite testar a próxima etapa antes de integrá-la.
 
 | Branch | `ETAPA_ATUAL` | Comando local e da CI | Comportamento verificado |
 |---|---|---|---|
 | `projeto/00-ambiente` | `00` | `make test ETAPA=00` | planta e build inicial |
-| `projeto/01-aquisicao` | `01` | `make test ETAPA=01` | anteriores + aquisição e falhas de entrada |
+| `projeto/01-aquisicao` | `01` | `make test ETAPA=01` | anteriores + aquisição, falhas e testes autorais C++ |
 | `projeto/02-controle` | `02` | `make test ETAPA=02` | anteriores + comando e confirmação da planta |
-| `projeto/03-supervisor` | `03` | `make test ETAPA=03` | anteriores + tabela e diagnósticos na tela |
+| `projeto/03-supervisor` | `03` | `make test ETAPA=03` | anteriores + tela e testes autorais Python |
 | `projeto/04-entrega` | `03` | `make test ETAPA=03` | regressão completa e casos autorais |
 
-Nas etapas 03, instale `requirements.txt` e use
+Na etapa 03, instale `requirements-dev.txt` e use
 `make test ETAPA=03 PYTHON=.venv/bin/python`; o ambiente ativo da CI já tem as
 dependências. `AppTest` verifica a tela sem iniciar servidor nem navegador.
 
@@ -123,10 +208,57 @@ explicação técnica, UML quando mudar e registro do uso de IA.
 
 ## 6. Testes que a equipe acrescenta
 
-Crie `tests/autorais_*.py` com `unittest`. O runner repete esses casos em todas
-as etapas. Se acrescentar classes C++, inclua sua compilação e seus testes no
-Makefile; não remova as regressões existentes. Verifique as estratégias com
-entradas conhecidas, valores de fronteira, leituras inválidas e cenário escolhido.
+Cada objeto que você criar precisa de testes que mostrem seu comportamento.
+Os contratos fornecidos não substituem os testes das suas classes e políticas.
+Para cada responsabilidade, escolha um caso comum, uma fronteira e uma falha
+quando aplicáveis. Verifique resultado e estado preservado; não apenas que o código executa.
+
+| Código da equipe | Onde escrever os testes | Como serão executados |
+|---|---|---|
+| classes C++ em `controlador/` | `tests/cpp/autorais_*.cpp`, com um `main` por arquivo | o Makefile compila e o runner executa os binários |
+| objetos Python do supervisor/persistência | `tests/autorais_*.py`, usando `unittest` | o runner descobre e executa os casos |
+
+O Makefile encontra arquivos `.cpp` dentro de `controlador/` e liga os objetos
+de implementação aos testes, sem incluir o `main.cpp` do aplicativo. Classes
+definidas em `.hpp` também podem ser incluídas pelos testes. Separe a lógica de
+domínio da função `main`, para testá-la sem iniciar o programa completo.
+
+Desde a etapa 01, o comando exige ao menos um executável de teste autoral C++;
+na etapa 03, exige também casos autorais Python. Essa checagem confirma registro
+e execução, sem provar que todas as classes foram cobertas. A matriz de testes
+e a revisão do código complementam a automação.
+
+Comece pelo [guia de testes de objetos](docs/TESTES.md), com exemplos completos,
+saídas esperadas e um exercício de provocar e corrigir uma falha. Depois rode:
+
+```bash
+make test ETAPA=03 PYTHON=.venv/bin/python
+make cobertura ETAPA=03 PYTHON=.venv/bin/python
+```
+
+Na primeira linha, procure os nomes dos seus testes, além dos testes fornecidos.
+A segunda recompila C++ com instrumentação, repete os mesmos testes e produz:
+
+- `build/relatorios/cpp/index.html`: linhas e ramificações do controlador C++;
+- `build/relatorios/python/index.html`: linhas e ramificações do Python;
+- `build/relatorios/LEIA-ME.md`: etapa e resultado da execução medida.
+
+Abra os HTMLs localmente no navegador. Localize suas classes e métodos e encontre
+os caminhos não executados. No relatório Python, separe a planta pronta dos
+objetos escritos pela equipe: o percentual total da planta não demonstra que
+o seu código foi testado. Na base inicial, C++ pode aparecer com 0% e Streamlit
+com 0%, pois esses comportamentos ainda não foram implementados nem exercitados.
+
+Na demonstração, rode `make test`, mostre seus casos passando e explique uma
+lacuna do relatório e como investigá-la. Uma condição pode executar e produzir
+resultado errado; por isso cobertura alta precisa acompanhar verificações de
+resultado. Não há percentual mínimo arbitrário nem promessa de qualidade por
+uma métrica isolada. A CI também gera os relatórios, disponíveis como artefato
+`cobertura` da execução correspondente ao commit.
+
+Mantenha no README da sua entrega uma matriz com **objeto/método, comportamento,
+teste, caso comum/fronteira/falha e lacuna conhecida**. Preserve as regressões
+anteriores ao acrescentar os casos da nova etapa.
 
 Os testes fornecidos verificam contratos observáveis e integração básica. Eles
 não provam a correção do controle, a aplicação de padrões, a qualidade da UML,

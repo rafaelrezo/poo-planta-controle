@@ -1,0 +1,17 @@
+[run]
+branch = True
+parallel = True
+patch = subprocess
+source = .
+relative_files = True
+omit =
+    tests/*
+    tools/*
+    exemplos/*
+    build/*
+    .venv/*
+    */site-packages/*
+
+[report]
+show_missing = True
+include_namespace_packages = True

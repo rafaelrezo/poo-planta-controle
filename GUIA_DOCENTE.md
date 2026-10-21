@@ -21,6 +21,26 @@ make test ETAPA=01
 O primeiro passa; o segundo falha nos comportamentos ainda não implementados.
 Não afrouxar o contrato para obter um verde inicial nas etapas autorais.
 
+## Testes autorais e cobertura
+
+O README conduz geração, inspeção do JSON e observação de atuação antes da
+implementação. `docs/TESTES.md` e `exemplos/testes/` demonstram o ciclo de escrever
+um teste, observar uma falha e corrigi-la, sem fornecer políticas do projeto.
+
+O Makefile compila implementações C++ e os executáveis `tests/cpp/autorais_*.cpp`;
+o runner executa-os e descobre `tests/autorais_*.py`. Ao menos um teste C++ é
+exigido desde a etapa 01, e testes Python desde a 03. Isso assegura registro e
+execução, mas a revisão deve verificar a cobertura dos objetos reais da equipe,
+sem aceitar somente os exemplos copiados nem testes vazios como evidência.
+
+`make test` lê `ETAPA_ATUAL` se não houver etapa explícita.
+`make cobertura` repete a suíte com GCC/gcov e coverage.py em diretório próprio,
+sem acumular medições anteriores. A CI guarda os relatórios como artefato.
+A matriz objeto/método/comportamento/caso deve orientar a leitura dos relatórios;
+planta fornecida e exemplos não demonstram cobertura do código autoral.
+Não foi imposto percentual mínimo arbitrário. Exigir demonstração de resultados,
+casos de fronteira/falha e explicação dos caminhos ainda não exercitados.
+
 ## Uso em aula de arquivos
 
 1. Gerar três ciclos finitos e abrir `planta.json` com `python3 -m json.tool`.

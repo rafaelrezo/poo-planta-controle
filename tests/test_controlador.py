@@ -19,7 +19,8 @@ class TestAquisicao(unittest.TestCase):
 
     def executar(self):
         return subprocess.run(
-            [str(Path("build/controlador").resolve()), "--dados", str(self.dados), "--uma-vez"],
+            [os.environ.get("POO_CONTROLADOR", str(Path("build/controlador").resolve())),
+             "--dados", str(self.dados), "--uma-vez"],
             capture_output=True, text=True, timeout=10,
         )
 
